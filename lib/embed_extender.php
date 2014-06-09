@@ -29,7 +29,7 @@ function embed_extender_parser($input, $view, $context)
 			$width = 400; //Size for content
 		}
 	}
-	$patterns = array('#(((http://)?)|(^./))(((www.)?)|(^./))youtube\.com/watch[?]v=([^\[\]()<.,\s\n\t\r]+)#i'
+	$patterns = array('#(((http://)?)|(^./))(((www.)?)|(^./))youtube\.com/([^\[\]()<.,\s\n\t\r]+)#i'
 						,'#(((http://)?)|(^./))(((www.)?)|(^./))youtu\.be/([^\[\]()<.,\s\n\t\r]+)#i'
 						,'/(http:\/\/)(www\.)?(vimeo\.com\/groups)(.*)(\/videos\/)([0-9]*)/'
 						,'/(http:\/\/)(www\.)?(metacafe\.com\/watch\/)([0-9a-zA-Z_-]*)(\/[0-9a-zA-Z_-]*)(\/)/'
