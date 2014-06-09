@@ -36,7 +36,6 @@ function videoembed_create_embed_object($url, $guid, $videowidth=0, $input) {
 	if (!isset($url)) {
 		return '<p><b>' . elgg_echo('embedvideo:novideo') . '</b></p>';
 	}
-
 	if (strpos($url, 'youtube.com') != false) {
 		return videoembed_youtube_handler($url, $guid, $videowidth);
 	} else if (strpos($url, 'youtu.be') != false) {
@@ -104,10 +103,11 @@ function videoembed_add_object($type, $url, $guid, $width, $height) {
 	// could move these into an array and use sprintf
 	switch ($type) {
 		case 'youtube':
-			$videodiv .= "<object width=\"$width\" height=\"$height\"><param name=\"movie\" value=\"https://{$url}&hl=en&fs=1&showinfo=0\"></param><param name=\"allowFullScreen\" value=\"true\"></param><embed src=\"https://{$url}&hl=en&fs=1&showinfo=0\" type=\"application/x-shockwave-flash\" allowfullscreen=\"true\" width=\"$width\" height=\"$height\"></embed></object>";
+			$videodiv .= "<iframe width=\"$width\" height=\"$height\" src=\"{$url}\" frameborder=\"0\" allowfullscreen></iframe>";
+			//$videodiv .= "<object width=\"$width\" height=\"$height\"><param name=\"movie\" value=\"http://{$url}&hl=en&fs=1&showinfo=0\"></param><param name=\"allowFullScreen\" value=\"true\"></param><embed src=\"http://{$url}&hl=en&fs=1&showinfo=0\" type=\"application/x-shockwave-flash\" allowfullscreen=\"true\" width=\"$width\" height=\"$height\"></embed></object>";
 			break;
 		case 'google':
-			$videodiv .= "<embed id=\"VideoPlayback\" src=\"https://video.google.com/googleplayer.swf?docid={$url}&hl=en&fs=true\" style=\"width:{$width}px;height:{$height}px\" allowFullScreen=\"true\" allowScriptAccess=\"always\" type=\"application/x-shockwave-flash\"> </embed>";
+			$videodiv .= "<embed id=\"VideoPlayback\" src=\"http://video.google.com/googleplayer.swf?docid={$url}&hl=en&fs=true\" style=\"width:{$width}px;height:{$height}px\" allowFullScreen=\"true\" allowScriptAccess=\"always\" type=\"application/x-shockwave-flash\"> </embed>";
 			break;
 		case 'vimeo':
 			$videodiv .= "<object width=\"$width\" height=\"$height\"><param name=\"allowfullscreen\" value=\"true\" /><param name=\"allowscriptaccess\" value=\"always\" /><param name=\"movie\" value=\"http://vimeo.com/moogaloop.swf?clip_id={$url}&amp;server=vimeo.com&amp;show_title=0&amp;show_byline=0&amp;show_portrait=0&amp;color=&amp;fullscreen=1\" /><embed src=\"http://vimeo.com/moogaloop.swf?clip_id={$url}&amp;server=vimeo.com&amp;show_title=0&amp;show_byline=0&amp;show_portrait=0&amp;color=&amp;fullscreen=1\" type=\"application/x-shockwave-flash\" allowfullscreen=\"true\" allowscriptaccess=\"always\" width=\"$width\" height=\"$height\"></embed></object>";
@@ -181,31 +181,77 @@ function videoembed_youtube_handler($url, $guid, $videowidth) {
  * parse youtube url
  *
  * @param string $url
- * @return string subdomain.youtube.com/v/hash
- */
-function videoembed_youtube_parse_url($url) {
-
-	if (strpos($url, 'feature=hd') != false) {
-		// this is high def with a different aspect ratio
-	}
-
-	// This provides some security against inserting bad content.
-	// Divides url into http://, www or localization, domain name, path.
-	if (!preg_match('/(https?:\/\/)([a-zA-Z]{2,3}\.)(youtube\.com\/)(.*)/', $url, $matches)) {
-		//echo "malformed youtube url";
-		return;
-	}
-
-	$domain = $matches[2] . $matches[3];
-	$path = $matches[4];
-
-	$parts = parse_url($url);
-	parse_str($parts['query'], $vars);
-	$hash = $vars['v'];
-
-	return $domain . 'v/' . $hash;
-}
-
+ * @return string 
+*/
+// Automatically parse youtube video/playlist links and generate the respective embed code
+ function videoembed_youtube_parse_url($data)
+ {
+ // Check if youtube link is a playlist
+ if (strpos($data, 'list=') !== false) {
+ // Generate the embed code
+ $data = preg_replace('~(?:http|https|)(?::\/\/|)(?:www.|)(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/ytscreeningroom\?v=|\/feeds\/api\/videos\/|\/user\S*[^\w\-\s]|\S*[^\w\-\s]))([\w\-]{12,})[a-z0-9;:@#?&%=+\/\$_.-]*~i', 'https://www.youtube.com/embed/videoseries?list=$1', $data);
+ 
+return $data;
+ }
+ // Check if youtube link is not a playlist but a video [with time identifier]
+ if (strpos($data, 'list=') === false && strpos($data, 't=') !== false) {
+ $time_in_secs = null;
+ 
+// Get the time in seconds from the time function
+ $time_in_secs = ConvertTimeToSeconds($data);
+ 
+// Generate the embed code
+ $data = preg_replace('~(?:http|https|)(?::\/\/|)(?:www.|)(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/ytscreeningroom\?v=|\/feeds\/api\/videos\/|\/user\S*[^\w\-\s]|\S*[^\w\-\s]))([\w\-]{11})[a-z0-9;:@#?&%=+\/\$_.-]*~i', 'https://www.youtube.com/embed/$1?start=' . $time_in_secs, $data);
+ 
+return $data;
+ }
+ // If the above conditions were false then the youtube link is probably just a plain video link. So generate the embed code already.
+ $data = preg_replace('~(?:http|https|)(?::\/\/|)(?:www.|)(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/ytscreeningroom\?v=|\/feeds\/api\/videos\/|\/user\S*[^\w\-\s]|\S*[^\w\-\s]))([\w\-]{11})[a-z0-9;:@#?&%=+\/\$_.-]*~i', 'https://www.youtube.com/embed/$1', $data);
+ 
+return $data;
+ }
+ 
+// Check for time identifier in the youtube video link and conver it into seconds
+ function ConvertTimeToSeconds($data)
+ {
+ $time = null;
+ $hours = null;
+ $minutes = null;
+ $seconds = null;
+ 
+$pattern_time_split = "([0-9]{1-2}+[^hms])";
+ 
+// Regex to check for youtube video link with time identifier
+ $youtube_time = '~(?:http|https|)(?::\/\/|)(?:www.|)(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/ytscreeningroom\?v=|\/feeds\/api\/videos\/|\/user\S*[^\w\-\s]|\S*[^\w\-\s]))([\w\-]{11})[a-z0-9;:@#?&%=+\/\$_.-]*(t=((\d+h)?(\d+m)?(\d+s)?))~i';
+ 
+// Check for time identifier in the youtube video link, extract it and convert it to seconds
+ if (preg_match($youtube_time, $data, $matches)) {
+ // Check for hours
+ if (isset($matches[4])) {
+ $hours = $matches[4];
+ $hours = preg_split($pattern_time_split, $hours);
+ $hours = substr($hours[0], 0, -1);
+ }
+ 
+// Check for minutes
+ if (isset($matches[5])) {
+ $minutes = $matches[5];
+ $minutes = preg_split($pattern_time_split, $minutes);
+ $minutes = substr($minutes[0], 0, -1);
+ }
+ 
+// Check for seconds
+ if (isset($matches[6])) {
+ $seconds = $matches[6];
+ $seconds = preg_split($pattern_time_split, $seconds);
+ $seconds = substr($seconds[0], 0, -1);
+ }
+ 
+// Convert time to seconds
+ $time = (($hours*3600) + ($minutes*60) + $seconds);
+ }
+ return $time;
+ }
 /**
  * parse youtu.be url
  *
